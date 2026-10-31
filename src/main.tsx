@@ -1,3 +1,4 @@
+import { AiComposer } from "./AiComposer";
 import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -88,9 +89,15 @@ function App() {
     [inlineError, setInlineError] = useState(""),
     [confirmTab, setConfirmTab] = useState<string | null>(null),
     [imported, setImported] = useState<State | null>(null);
+  const [aiRequest, setAiRequest] = useState<{
+    id: number;
+    goal: string;
+  } | null>(null);
   const ownsLock = useRef(false);
   const current = useRef<State | null>(null);
   const file = useRef<HTMLInputElement>(null);
+  const taskInput = useRef<HTMLInputElement>(null);
+  const aiRun = useRef(0);
   useEffect(() => {
     let release: () => void = () => {};
     let disposed = false;
@@ -191,8 +198,19 @@ function App() {
   const switchTab = (id: string) => {
     setRename(null);
     setDraft("");
+    setAiRequest(null);
     setInlineError("");
     act({ type: "tab-select", id });
+  };
+  const requestAiBreakdown = () => {
+    const goal = draft.trim();
+    if (!goal) {
+      setInlineError("Enter a topic or task to break down with AI.");
+      taskInput.current?.focus();
+      return;
+    }
+    setInlineError("");
+    setAiRequest({ id: ++aiRun.current, goal });
   };
   return (
     <main>
@@ -417,6 +435,7 @@ function App() {
                     });
                     if (commit(next)) {
                       setDraft("");
+                      setAiRequest(null);
                       setInlineError("");
                     }
                   } catch (err) {
@@ -426,22 +445,53 @@ function App() {
               >
                 <Plus size={20} />
                 <input
+                  ref={taskInput}
                   aria-label="New task"
-                  placeholder="What's one small thing you can do?"
+                  placeholder="What's one small thing you can do? or Use AI to breakdown a topic to tasks"
                   value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
+                  onChange={(e) => {
+                    setDraft(e.target.value);
+                    if (aiRequest) setAiRequest(null);
+                  }}
                 />
                 <button type="submit">ADD ↵</button>
                 <button
                   type="button"
                   className="ai"
-                  title="AI task breakdown — coming later"
-                  aria-label="AI task breakdown — coming later"
-                  aria-disabled="true"
+                  title="Breakdown tasks using AI"
+                  aria-label="Breakdown tasks using AI"
+                  onClick={requestAiBreakdown}
                 >
                   <Sparkles size={19} />
                 </button>
               </form>
+              {aiRequest && !imported && (
+                <AiComposer
+                  key={`${tab.id}-${aiRequest.id}`}
+                  goal={aiRequest.goal}
+                  onCancel={() => setAiRequest(null)}
+                  onAdd={(batch) => {
+                    if (error || !current.current) return false;
+                    try {
+                      const next = transition(current.current, {
+                        type: "task-add-batch",
+                        tabId: tab.id,
+                        tasks: batch.tasks,
+                      });
+                      if (!commit(next)) return false;
+                      setDraft("");
+                      setMessages((v) => [
+                        ...v,
+                        `Created ${batch.tasks.length} tasks. ${batch.scopeNote}`,
+                      ]);
+                      return true;
+                    } catch (e) {
+                      setInlineError(String(e));
+                      return false;
+                    }
+                  }}
+                />
+              )}
               <div className="task-list" role="region" aria-label="Tasks">
                 <DndContext
                   sensors={sensors}

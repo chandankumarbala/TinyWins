@@ -31,6 +31,11 @@ export type Action =
   | { type: "tab-rename"; id: string; name: string }
   | { type: "task-add"; tabId: string; title: string }
   | {
+      type: "task-add-batch";
+      tabId: string;
+      tasks: { title: string; estimatedMinutes: number }[];
+    }
+  | {
       type: "task-edit";
       tabId: string;
       id: string;
@@ -162,6 +167,45 @@ export function transition(
       completedAt: null,
       yellowShown: false,
     });
+  } else if (action.type === "task-add-batch") {
+    if (
+      !Array.isArray(action.tasks) ||
+      action.tasks.length < 1 ||
+      action.tasks.length > 12
+    )
+      throw new Error("A breakdown must contain between 1 and 12 tasks.");
+    const names = new Set(tab.tasks.map((task) => normalizeName(task.title)));
+    const tasks: Task[] = action.tasks.map((item) => {
+      if (
+        !item ||
+        typeof item.title !== "string" ||
+        !item.title.trim() ||
+        item.title.trim().length > 160 ||
+        !Number.isInteger(item.estimatedMinutes) ||
+        item.estimatedMinutes < 1 ||
+        item.estimatedMinutes > 30
+      )
+        throw new Error(
+          "Generated tasks need a title and an estimate from 1 to 30 minutes.",
+        );
+      const base = item.title.trim();
+      let title = base,
+        suffix = 2;
+      while (names.has(normalizeName(title))) title = `${base} (${suffix++})`;
+      names.add(normalizeName(title));
+      return {
+        id: crypto.randomUUID(),
+        title,
+        status: "paused",
+        createdAt: now,
+        plannedMs: item.estimatedMinutes * 60000,
+        elapsedMs: 0,
+        runningSince: null,
+        completedAt: null,
+        yellowShown: false,
+      };
+    });
+    tab.tasks.push(...tasks);
   } else if (action.type === "task-reorder") {
     if (
       action.ids.length !== tab.tasks.length ||

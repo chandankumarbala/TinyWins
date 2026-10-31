@@ -174,3 +174,82 @@ test("Tiny Wins brand mark and favicon load", async ({ page }) => {
     "/tiny-wins.svg",
   );
 });
+
+test("AI creates estimated tasks in order without exposing tab data", async ({
+  page,
+}) => {
+  await page.route("**/api/ai/status", (r) =>
+    r.fulfill({ json: { available: true } }),
+  );
+  await page.route("**/api/ai/breakdown", async (r) => {
+    expect(r.request().postDataJSON()).toEqual({ goal: "Write a report" });
+    await r.fulfill({
+      json: {
+        tasks: [
+          { title: "Open report", estimatedMinutes: 5 },
+          { title: "Write outline", estimatedMinutes: 10 },
+        ],
+        scopeNote: "",
+      },
+    });
+  });
+  await page.goto("/");
+  const input = page.getByLabel("New task", { exact: true });
+  await expect(input).toHaveAttribute(
+    "placeholder",
+    "What's one small thing you can do? or Use AI to breakdown a topic to tasks",
+  );
+  await input.fill("Write a report");
+  await page.getByLabel("Breakdown tasks using AI", { exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Open report", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Write outline", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".task").first()).toContainText("5 min");
+  await expect(input).toHaveValue("");
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "Write outline", exact: true }),
+  ).toBeVisible();
+});
+
+test("AI generate remains retryable after helper status recovers", async ({
+  page,
+}) => {
+  let statusCalls = 0;
+  await page.route("**/api/ai/status", (r) => {
+    statusCalls += 1;
+    return r.fulfill({ json: { available: statusCalls >= 2 } });
+  });
+  await page.route("**/api/ai/breakdown", async (r) => {
+    expect(r.request().postDataJSON()).toEqual({ goal: "Clean desk" });
+    await r.fulfill({
+      json: {
+        tasks: [{ title: "Clear desktop", estimatedMinutes: 10 }],
+        scopeNote: "",
+      },
+    });
+  });
+  await page.goto("/");
+  await page.getByLabel("New task", { exact: true }).fill("Clean desk");
+  await page.getByLabel("Breakdown tasks using AI", { exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText("OPENAI_API_KEY");
+  await page.getByLabel("Breakdown tasks using AI", { exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Clear desktop", exact: true }),
+  ).toBeVisible();
+});
+
+test("empty AI click does not create tasks", async ({ page }) => {
+  await page.route("**/api/ai/status", (r) =>
+    r.fulfill({ json: { available: true } }),
+  );
+  await page.goto("/");
+  await page.getByLabel("Breakdown tasks using AI", { exact: true }).click();
+  await expect(page.getByRole("alert")).toContainText(
+    "Enter a topic or task to break down with AI.",
+  );
+  await expect(page.locator(".task")).toHaveCount(0);
+});

@@ -4,7 +4,24 @@ A local-only desktop task app. Organize sectors into tabs, focus on one task per
 
 ## Development
 
-Use Node.js 24 LTS and npm. Run `npm install`, then `npm run dev`. Open the localhost URL printed by Vite. Keep the same origin and port to retain access to the same browser data.
+Use Node.js 24 LTS and npm. Run `npm install` once. Open the localhost URL printed by Vite. Keep the same origin and port to retain access to the same browser data.
+
+For AI breakdown, copy `.env.example` to `.env` and set `OPENAI_API_KEY`. Never use a `VITE_` prefix for secrets. Optional `OPENAI_MODEL` defaults to `gpt-5-mini`.
+
+Local run commands:
+
+- `npm run dev`: start frontend and backend together. Use this for the normal app with AI breakdown.
+- `npm run dev:web`: start the Vite frontend only on `127.0.0.1:5173`. AI generation will stay unavailable unless the backend is running separately.
+- `npm run dev:api`: start the local AI backend/helper only on `127.0.0.1:8788`. Use this with `npm run dev:web` when you want separate terminals.
+- `npm run build`: type-check and produce static frontend files in `dist/`.
+- `npm start`: run the production local server/API on `127.0.0.1:5173` after `npm run build`.
+
+Common setups:
+
+- **Frontend + backend together:** `npm run dev`
+- **Frontend only:** `npm run dev:web`
+- **Backend only:** `npm run dev:api`
+- **Production local:** `npm run build`, then `npm start`
 
 Commands:
 
@@ -29,3 +46,11 @@ Only one browser window can edit at a time. Use a modern desktop Chromium, Firef
 ## Verification
 
 Tests use synthetic fixtures and controlled timestamps. Browser tests cover primary workflows. No numeric coverage threshold is configured. Native packaging, synchronization, undo, and AI breakdown are deferred.
+
+## Phase 2: AI breakdown
+
+`npm run dev` starts Vite on 127.0.0.1:5173 and the helper on 127.0.0.1:8788. `npm run dev:web` runs manual-only mode unless `npm run dev:api` is also running. After `npm run build`, `npm start` serves the app and API locally on port 5173. Use the same browser origin to retain access to stored tasks.
+
+Click AI to open the inline composer. Enter generates; Shift+Enter inserts a newline; Escape cancels. Up to 12 ordered tasks are automatically added with editable 1–30-minute estimates. Conflicting titles gain numeric suffixes. New tasks start paused. A broad goal produces a first slice rather than pretending the whole project fits one session.
+
+Only the goal is sent to OpenAI. Existing tabs/tasks stay local. Cancellation discards late results but may not avoid provider charges. Limits: one active request, five attempts/minute, 45-second timeout. No automatic paid retries. Missing helper/key leaves manual tasks available. Tests mock provider responses; live generation is optional and incurs API charges.
