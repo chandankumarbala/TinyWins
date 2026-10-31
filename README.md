@@ -1,4 +1,4 @@
-# TODO — Small steps, real progress
+# Tiny Wins — Small steps. Real progress.
 
 A local-only desktop task app. Organize sectors into tabs, focus on one task per tab, and track active effort.
 
@@ -16,7 +16,7 @@ Commands:
 - `npm test`: run deterministic domain tests.
 - `npm run test:e2e`: run browser acceptance tests (install browsers with `npx playwright install`).
 
-## Using TODO
+## Using Tiny Wins
 
 Enter creates tasks and saves edits. Escape cancels edits. Click a task title or duration to edit; pause running tasks first. Double-click a tab name to rename it. Finish permanently freezes a timer. Delete tasks with two clicks within 20 seconds. Tab deletion requires confirmation.
 

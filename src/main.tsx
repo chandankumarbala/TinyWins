@@ -118,7 +118,7 @@ function App() {
       async (lock) => {
         if (!lock) {
           setError(
-            "TODO is open in another window. Close it and reload this window.",
+            "Tiny Wins is open in another window. Close it and reload this window.",
           );
           return;
         }
@@ -196,39 +196,6 @@ function App() {
   };
   return (
     <main>
-      <header>
-        <a className="wordmark" href="#">
-          to<span>do</span>
-          <i>✳</i>
-        </a>
-        <div className="header-tools">
-          <Icon
-            label="Export backup"
-            onClick={() => state && exportBackup(state)}
-          >
-            <Download size={18} />
-          </Icon>
-          <Icon
-            label="Import backup"
-            onClick={() => {
-              if (ownsLock.current) file.current?.click();
-            }}
-          >
-            <Upload size={18} />
-          </Icon>
-          <Icon
-            label="Toggle theme"
-            onClick={() =>
-              act({
-                type: "theme",
-                theme: state?.theme === "dark" ? "light" : "dark",
-              })
-            }
-          >
-            {state?.theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
-          </Icon>
-        </div>
-      </header>
       <input
         hidden
         ref={file}
@@ -245,15 +212,6 @@ function App() {
           e.target.value = "";
         }}
       />
-      <section className="intro">
-        <p className="eyebrow">A LITTLE FOCUS GOES A LONG WAY</p>
-        <h1>
-          Small steps.
-          <br />
-          <em>Real progress.</em>
-        </h1>
-        <p>Make room for one thing at a time.</p>
-      </section>
       {error && (
         <div role="alert" className="error">
           {error}
@@ -296,7 +254,7 @@ function App() {
               onClick={() => {
                 if (
                   ownsLock.current &&
-                  window.confirm("Reset all local TODO data permanently?")
+                  window.confirm("Reset all local Tiny Wins data permanently?")
                 ) {
                   try {
                     save(initialState());
@@ -314,6 +272,51 @@ function App() {
       )}
       {ready && state && (
         <section className="workspace">
+          <header>
+            <div className="brand">
+              <img
+                className="brand-mark"
+                src="/tiny-wins.svg"
+                alt=""
+                aria-hidden="true"
+                width="32"
+                height="32"
+              />
+              <h1>Tiny Wins</h1>
+              <p>Small steps. Real progress.</p>
+            </div>
+            <div className="header-tools">
+              <Icon
+                label="Export backup"
+                onClick={() => state && exportBackup(state)}
+              >
+                <Download size={18} />
+              </Icon>
+              <Icon
+                label="Import backup"
+                onClick={() => {
+                  if (ownsLock.current) file.current?.click();
+                }}
+              >
+                <Upload size={18} />
+              </Icon>
+              <Icon
+                label="Toggle theme"
+                onClick={() =>
+                  act({
+                    type: "theme",
+                    theme: state.theme === "dark" ? "light" : "dark",
+                  })
+                }
+              >
+                {state.theme === "dark" ? (
+                  <Sun size={18} />
+                ) : (
+                  <Moon size={18} />
+                )}
+              </Icon>
+            </div>
+          </header>
           <nav aria-label="Task sectors">
             {state.tabs.map((t) => (
               <div
@@ -354,12 +357,6 @@ function App() {
                     </span>
                   </button>
                 )}
-                <Icon
-                  label={`Rename ${t.name}`}
-                  onClick={() => setRename(t.id)}
-                >
-                  <Pencil size={12} />
-                </Icon>
                 <Icon
                   label={`Delete ${t.name}`}
                   onClick={() => setConfirmTab(t.id)}
@@ -407,16 +404,6 @@ function App() {
           )}
           {tab ? (
             <>
-              <div className="list-heading">
-                <div>
-                  <p className="eyebrow">YOUR NEXT SMALL WINS</p>
-                  <h2>{tab.name}</h2>
-                </div>
-                <span className="count">
-                  {tab.tasks.filter((t) => t.status !== "completed").length}{" "}
-                  left to do
-                </span>
-              </div>
               <form
                 className="add-task"
                 onSubmit={(e) => {
@@ -455,7 +442,7 @@ function App() {
                   <Sparkles size={19} />
                 </button>
               </form>
-              <div className="task-list">
+              <div className="task-list" role="region" aria-label="Tasks">
                 <DndContext
                   sensors={sensors}
                   collisionDetection={closestCenter}
@@ -638,6 +625,7 @@ function TaskRow({
         transform: CSS.Transform.toString(sortable.transform),
         transition: sortable.transition,
       }}
+      data-status={task.status}
       className={`task ${phase} ${done ? "completed" : ""}`}
     >
       <div
