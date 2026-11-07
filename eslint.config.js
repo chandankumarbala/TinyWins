@@ -3,6 +3,7 @@ export default tseslint.config(
   {
     ignores: [
       "dist/**",
+      ".worktrees/**",
       "node_modules/**",
       "src-tauri/target/**",
       "test-results/**",
