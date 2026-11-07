@@ -108,12 +108,36 @@ describe("domain", () => {
     expect(phaseAt(t, 1001)).toBe("overtime");
     let result = evaluateAlerts(s, 500);
     expect(result.alerts).toHaveLength(1);
+    expect(result.alerts[0]).toMatchObject({
+      tabId: tab(s).id,
+      taskId: t.id,
+      tabName: "My Tasks",
+      taskTitle: "Task",
+      phase: "yellow",
+      message: expect.stringContaining("Halfway there"),
+    });
     expect(evaluateAlerts(result.state, 501).alerts).toHaveLength(0);
     result = evaluateAlerts(result.state, 800);
     expect(result.alerts).toHaveLength(1);
+    expect(result.alerts[0]).toMatchObject({
+      taskId: t.id,
+      phase: "red",
+      message: expect.stringContaining("Final stretch"),
+    });
     result = evaluateAlerts(result.state, 1001);
     expect(result.alerts).toHaveLength(1);
-    expect(evaluateAlerts(result.state, 601001).alerts).toHaveLength(1);
+    expect(result.alerts[0]).toMatchObject({
+      taskId: t.id,
+      phase: "overtime",
+      message: expect.stringContaining("Overtime"),
+    });
+    const repeated = evaluateAlerts(result.state, 601001);
+    expect(repeated.alerts).toHaveLength(1);
+    expect(repeated.alerts[0]).toMatchObject({
+      taskId: t.id,
+      phase: "overtime",
+      message: expect.stringContaining("Overtime"),
+    });
   });
   it("keeps independent active tasks in different tabs", () => {
     let s = act(add(initialState()), "task-toggle");

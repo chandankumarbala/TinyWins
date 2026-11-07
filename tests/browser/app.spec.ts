@@ -12,7 +12,7 @@ test("create, run, complete and restore a task", async ({ page }) => {
   ).toBeVisible();
   await page.getByLabel("Finish One small step", { exact: true }).click();
   await page.reload();
-  await expect(page.getByText("Completed ·", { exact: false })).toBeVisible();
+  await expect(page.getByText("Done ·", { exact: false })).toBeVisible();
 });
 test("delete the last tab and recreate it", async ({ page }) => {
   await page.goto("/");
@@ -22,6 +22,27 @@ test("delete the last tab and recreate it", async ({ page }) => {
   await expect(
     page.getByRole("button", { name: /^My Tasks\s*0\/0$/ }),
   ).toBeVisible();
+});
+
+test("web target still exports and imports backups through the browser controls", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page
+    .getByLabel("New task", { exact: true })
+    .fill("Keep browser working");
+  await page.getByLabel("New task", { exact: true }).press("Enter");
+
+  const raw = await page.evaluate(() => localStorage.getItem("todo.state.v1"));
+  expect(raw).toContain("Keep browser working");
+
+  await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem("todo.state.v1")!);
+    state.tabs[0].tasks = [];
+    localStorage.setItem("todo.state.v1", JSON.stringify(state));
+  });
+  await page.reload();
+  await expect(page.getByText("Keep browser working")).toHaveCount(0);
 });
 
 test("compact header, scrolling and theme persistence", async ({ page }) => {
@@ -61,6 +82,261 @@ test("compact header, scrolling and theme persistence", async ({ page }) => {
   await expect(input).toBeVisible();
 });
 
+test("settings panel exposes theme and native options without changing web defaults", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByLabel("Settings", { exact: true }).click();
+
+  await expect(
+    page.getByRole("heading", { name: "Settings", exact: true }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Theme preference")).toHaveValue("light");
+  await expect(page.getByLabel("Always on top")).toBeDisabled();
+
+  await page.getByLabel("Theme preference").selectOption("dark");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+});
+
+test("footer stays visible over the scrolling task list in the native layout", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 440, height: 520 });
+  await page.goto("/");
+  await page.locator(".workspace").evaluate((el) => {
+    el.setAttribute("data-platform", "tauri");
+  });
+  const input = page.getByLabel("New task", { exact: true });
+  for (let i = 0; i < 18; i++) {
+    await input.fill(`Stacked task ${i}`);
+    await input.press("Enter");
+  }
+
+  const list = page.getByRole("region", { name: "Tasks", exact: true });
+  await list.evaluate((el) => {
+    el.scrollTop = el.scrollHeight;
+  });
+
+  const layout = await page.locator(".workspace").evaluate((el) => {
+    const footer = el.querySelector("footer")!;
+    const list = el.querySelector(".task-list")!;
+    const footerRect = footer.getBoundingClientRect();
+    const listStyle = getComputedStyle(list);
+    const footerStyle = getComputedStyle(footer);
+    return {
+      footerBottom: footerRect.bottom,
+      viewportHeight: window.innerHeight,
+      footerPosition: footerStyle.position,
+      footerBottomInset: footerStyle.bottom,
+      listPaddingBottom: Number.parseFloat(listStyle.paddingBottom),
+      footerHeight: footerRect.height,
+    };
+  });
+  expect(layout.footerBottom).toBeLessThanOrEqual(layout.viewportHeight);
+  expect(layout.footerPosition).toBe("sticky");
+  expect(layout.footerBottomInset).toBe("0px");
+  expect(layout.listPaddingBottom).toBeGreaterThanOrEqual(layout.footerHeight);
+});
+
+test("native layout uses one unified aqua surface", async ({ page }) => {
+  await page.setViewportSize({ width: 440, height: 520 });
+  await page.goto("/");
+  await page.getByLabel("New task", { exact: true }).waitFor();
+  await page.locator("main").evaluate((el) => {
+    el.setAttribute("data-platform", "tauri");
+  });
+  await page.locator(".workspace").evaluate((el) => {
+    el.setAttribute("data-platform", "tauri");
+  });
+
+  const surface = await page.locator(".workspace").evaluate((workspace) => {
+    const main = document.querySelector("main")!;
+    const mainStyle = getComputedStyle(main);
+    const workspaceStyle = getComputedStyle(workspace);
+    return {
+      mainBackground: mainStyle.backgroundImage,
+      workspaceBorderWidth: workspaceStyle.borderTopWidth,
+      workspaceBorderRadius: workspaceStyle.borderTopLeftRadius,
+      workspaceBoxShadow: workspaceStyle.boxShadow,
+    };
+  });
+
+  expect(surface.mainBackground).toContain("gradient");
+  expect(surface.workspaceBorderWidth).toBe("0px");
+  expect(surface.workspaceBorderRadius).toBe("0px");
+  expect(surface.workspaceBoxShadow).toBe("none");
+});
+
+test("tabs use one full pill row with labels counts and close actions", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 440, height: 520 });
+  await page.goto("/");
+  await page.getByLabel("New task", { exact: true }).waitFor();
+  await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem("todo.state.v1")!);
+    state.tabs = ["Purchases", "Office"].map((name, index) => ({
+      ...state.tabs[0],
+      id: crypto.randomUUID(),
+      name,
+      tasks: Array.from({ length: 2 - index }, (_, taskIndex) => ({
+        id: crypto.randomUUID(),
+        title: `${name} task ${taskIndex}`,
+        status: taskIndex < 2 - index ? "completed" : "paused",
+        createdAt: Date.now(),
+        plannedMs: 600000,
+        elapsedMs: 0,
+        runningSince: null,
+        completedAt: Date.now(),
+        yellowShown: false,
+      })),
+      lastOperatedAt: Date.now() - index,
+    }));
+    state.selectedTabId = state.tabs[0].id;
+    localStorage.setItem("todo.state.v1", JSON.stringify(state));
+  });
+  await page.reload();
+
+  await expect(page.locator(".tab-current")).toHaveCount(0);
+  await expect(page.locator(".tab-shortcuts")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: /^Purchases\s*2\/2$/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /^Office\s*1\/1$/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByLabel("Delete Purchases", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Delete Office", { exact: true })).toBeVisible();
+  await expect(page.getByLabel("Add tab", { exact: true })).toBeVisible();
+
+  const metrics = await page.locator("nav").evaluate((nav) => {
+    const selected = nav.querySelector(".tab.selected")!;
+    const inactive = nav.querySelector(".tab:not(.selected)")!;
+    const add = nav.querySelector(".icon[aria-label='Add tab']")!;
+    return {
+      direction: getComputedStyle(nav).flexDirection,
+      navHeight: nav.getBoundingClientRect().height,
+      selectedWidth: selected.getBoundingClientRect().width,
+      selectedHeight: selected.getBoundingClientRect().height,
+      inactiveHeight: inactive.getBoundingClientRect().height,
+      addSize: add.getBoundingClientRect().width,
+      selectedTextColor: getComputedStyle(selected.querySelector("button")!)
+        .color,
+      selectedNameColor: getComputedStyle(selected.querySelector(".tab-name")!)
+        .color,
+      selectedCloseSize: selected
+        .querySelector(".icon")!
+        .getBoundingClientRect().width,
+      inactiveCloseSize: inactive
+        .querySelector(".icon")!
+        .getBoundingClientRect().width,
+    };
+  });
+  expect(metrics.direction).toBe("row");
+  expect(metrics.navHeight).toBeGreaterThanOrEqual(34);
+  expect(metrics.navHeight).toBeLessThanOrEqual(46);
+  expect(metrics.selectedWidth).toBeLessThanOrEqual(138);
+  expect(metrics.selectedHeight).toBeGreaterThanOrEqual(34);
+  expect(metrics.inactiveHeight).toBeGreaterThanOrEqual(34);
+  expect(metrics.addSize).toBeGreaterThanOrEqual(32);
+  expect(metrics.selectedTextColor).toBe("rgb(255, 255, 255)");
+  expect(metrics.selectedNameColor).toBe("rgb(255, 255, 255)");
+  expect(metrics.selectedCloseSize).toBeGreaterThanOrEqual(24);
+  expect(metrics.inactiveCloseSize).toBeGreaterThanOrEqual(24);
+});
+
+test("stage 3 composer keeps manual add primary and AI icon secondary", async ({
+  page,
+}) => {
+  await page.route("**/api/ai/status", (route) =>
+    route.fulfill({ json: { available: true } }),
+  );
+  await page.goto("/");
+
+  const composer = page.locator(".add-task");
+  await expect(composer.locator("> svg")).toHaveCount(0);
+  await expect(composer.getByLabel("New task", { exact: true })).toBeVisible();
+  await expect(
+    composer.getByRole("button", { name: "ADD ↵", exact: true }),
+  ).toBeVisible();
+
+  const ai = composer.getByLabel("Breakdown tasks using AI", { exact: true });
+  await expect(ai).toHaveAttribute("aria-disabled", "false");
+  await expect(ai).toHaveAttribute("title", "Breakdown tasks using AI");
+  await expect(composer).not.toContainText("AI");
+});
+
+test("task row actions hide while editing a task", async ({ page }) => {
+  await page.goto("/");
+  await page.getByLabel("New task", { exact: true }).fill("Buy a MacBook");
+  await page.getByLabel("New task", { exact: true }).press("Enter");
+
+  await page
+    .getByRole("button", { name: "Buy a MacBook", exact: true })
+    .click();
+
+  await expect(page.getByLabel("Edit title")).toBeVisible();
+  await expect(page.getByLabel("Finish Buy a MacBook")).toHaveCount(0);
+  await expect(page.getByLabel("Start Buy a MacBook")).toHaveCount(0);
+  await expect(page.getByLabel("Delete Buy a MacBook")).toHaveCount(0);
+});
+
+test("stage 3 task rows are compact and use subtle delete control", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 440, height: 620 });
+  await page.goto("/");
+  await page.getByLabel("New task", { exact: true }).fill("Compact row");
+  await page.getByLabel("New task", { exact: true }).press("Enter");
+
+  const row = page.locator(".task").first();
+  const metrics = await row.evaluate((element) => {
+    const deleteButton = element.querySelector(
+      ".task-delete",
+    ) as HTMLButtonElement;
+    const metadata = element.querySelector(".metadata")!;
+    return {
+      rowHeight: element.getBoundingClientRect().height,
+      deleteWidth: deleteButton.getBoundingClientRect().width,
+      deleteRadius: getComputedStyle(deleteButton).borderRadius,
+      deleteColor: getComputedStyle(deleteButton).color,
+      metadataWrap: getComputedStyle(metadata).whiteSpace,
+      metadataText: metadata.textContent ?? "",
+    };
+  });
+
+  expect(metrics.rowHeight).toBeLessThanOrEqual(68);
+  expect(metrics.deleteWidth).toBeLessThanOrEqual(30);
+  expect(metrics.deleteRadius).toBe("50%");
+  expect(metrics.deleteColor).toBe("rgb(23, 73, 95)");
+  expect(metrics.metadataWrap).toBe("nowrap");
+  expect(metrics.metadataText).toContain("Created");
+});
+
+test("task drag handle stays separated from the title text", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 360, height: 620 });
+  await page.goto("/");
+  await page.getByLabel("New task", { exact: true }).fill("want to buy milk");
+  await page.getByLabel("New task", { exact: true }).press("Enter");
+
+  const spacing = await page
+    .locator(".task")
+    .first()
+    .evaluate((element) => {
+      const drag = element.querySelector(".drag")!;
+      const content = element.querySelector(".task-content")!;
+      const dragRect = drag.getBoundingClientRect();
+      const contentRect = content.getBoundingClientRect();
+      return contentRect.left - dragRect.right;
+    });
+
+  expect(spacing).toBeGreaterThanOrEqual(6);
+});
+
 test("task states stay explicit in both themes", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/");
@@ -92,7 +368,7 @@ test("task states stay explicit in both themes", async ({ page }, testInfo) => {
     await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
     for (const phase of ["yellow", "red", "overtime", "completed"])
       await expect(page.locator(`.task.${phase}`)).toBeVisible();
-    await expect(page.getByText("In focus ·", { exact: false })).toBeVisible();
+    await expect(page.getByText("Running ·", { exact: false })).toBeVisible();
     await page.getByLabel("Delete Yellow", { exact: true }).click();
     await expect(
       page.getByLabel("Confirm delete Yellow", { exact: true }),
@@ -124,10 +400,40 @@ test("aqua glass styling survives theme changes", async ({ page }) => {
     expect(style.blur).toContain("blur(22px)");
     expect(style.blur).toContain("saturate");
     expect(style.background).toContain("gradient");
-    expect(style.radius).toBe("30px");
+    expect(style.radius).toBe("24px");
     expect(style.accent).toBe(theme === "light" ? "#006bdc" : "#80d8ff");
     if (theme === "light") await page.getByLabel("Toggle theme").click();
   }
+});
+
+test("stage 3 compact surface uses denser composer and quieter chrome", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 440, height: 620 });
+  await page.route("**/api/ai/status", (route) =>
+    route.fulfill({ json: { available: true } }),
+  );
+  await page.goto("/");
+
+  const metrics = await page.locator(".workspace").evaluate((workspace) => {
+    const header = workspace.querySelector("header")!;
+    const composer = workspace.querySelector(".add-task")!;
+    const footer = workspace.querySelector("footer")!;
+    const nav = workspace.querySelector("nav")!;
+    return {
+      headerHeight: header.getBoundingClientRect().height,
+      composerHeight: composer.getBoundingClientRect().height,
+      navHeight: nav.getBoundingClientRect().height,
+      footerHeight: footer.getBoundingClientRect().height,
+      shadow: getComputedStyle(workspace).boxShadow,
+    };
+  });
+
+  expect(metrics.headerHeight).toBeLessThanOrEqual(52);
+  expect(metrics.composerHeight).toBeLessThanOrEqual(56);
+  expect(metrics.navHeight).toBeLessThanOrEqual(38);
+  expect(metrics.footerHeight).toBeLessThanOrEqual(58);
+  expect(metrics.shadow).toContain("rgba");
 });
 
 test("one frosted workspace contains all task controls", async ({ page }) => {
@@ -154,7 +460,7 @@ test("one frosted workspace contains all task controls", async ({ page }) => {
   const row = workspace.locator('.task[data-status="running"]');
   await expect(row).toBeVisible();
   expect(await row.evaluate((el) => getComputedStyle(el).borderLeftWidth)).toBe(
-    "4px",
+    "2px",
   );
 });
 
@@ -197,7 +503,7 @@ test("AI creates estimated tasks in order without exposing tab data", async ({
   const input = page.getByLabel("New task", { exact: true });
   await expect(input).toHaveAttribute(
     "placeholder",
-    "What's one small thing you can do? or Use AI to breakdown a topic to tasks",
+    "What's one small thing you can do?",
   );
   await input.fill("Write a report");
   await page.getByLabel("Breakdown tasks using AI", { exact: true }).click();
@@ -207,11 +513,38 @@ test("AI creates estimated tasks in order without exposing tab data", async ({
   await expect(
     page.getByRole("button", { name: "Write outline", exact: true }),
   ).toBeVisible();
-  await expect(page.locator(".task").first()).toContainText("5 min");
+  await expect(page.locator(".task").first()).toContainText("5m");
   await expect(input).toHaveValue("");
   await page.reload();
   await expect(
     page.getByRole("button", { name: "Write outline", exact: true }),
+  ).toBeVisible();
+});
+
+test("AI assist is disabled with setup tooltip when OPENAI_API_KEY is missing", async ({
+  page,
+}) => {
+  await page.route("**/api/ai/status", (route) =>
+    route.fulfill({ json: { available: false } }),
+  );
+  await page.goto("/");
+
+  const ai = page.getByLabel("Breakdown tasks using AI", { exact: true });
+  await expect(ai).toBeVisible();
+  await expect(ai).toHaveAttribute("aria-disabled", "true");
+  await expect(ai).toHaveAttribute(
+    "title",
+    "Set OPENAI_API_KEY system variable to enable AI task breakdown.",
+  );
+
+  await page.getByLabel("New task", { exact: true }).fill("Write a report");
+  await ai.click({ force: true });
+  await expect(page.locator(".ai-composer")).toHaveCount(0);
+  await expect(page.getByRole("alert")).toHaveCount(0);
+
+  await page.getByLabel("New task", { exact: true }).press("Enter");
+  await expect(
+    page.getByRole("button", { name: "Write a report", exact: true }),
   ).toBeVisible();
 });
 
@@ -234,9 +567,13 @@ test("AI generate remains retryable after helper status recovers", async ({
   });
   await page.goto("/");
   await page.getByLabel("New task", { exact: true }).fill("Clean desk");
-  await page.getByLabel("Breakdown tasks using AI", { exact: true }).click();
-  await expect(page.getByRole("alert")).toContainText("OPENAI_API_KEY");
-  await page.getByLabel("Breakdown tasks using AI", { exact: true }).click();
+  const ai = page.getByLabel("Breakdown tasks using AI", { exact: true });
+  await expect(ai).toHaveAttribute("aria-disabled", "true");
+  await expect(ai).toHaveAttribute(
+    "title",
+    "Set OPENAI_API_KEY system variable to enable AI task breakdown.",
+  );
+  await ai.click({ force: true });
   await expect(
     page.getByRole("button", { name: "Clear desktop", exact: true }),
   ).toBeVisible();

@@ -12,6 +12,14 @@ export interface Task {
   lastAlertPhase?: string;
   lastAlertElapsed?: number;
 }
+export interface TaskAlert {
+  tabId: string;
+  taskId: string;
+  tabName: string;
+  taskTitle: string;
+  phase: Phase;
+  message: string;
+}
 export interface Tab {
   id: string;
   name: string;
@@ -273,9 +281,9 @@ export function transition(
 export function evaluateAlerts(
   state: State,
   now: number,
-): { state: State; alerts: string[] } {
+): { state: State; alerts: TaskAlert[] } {
   const next = structuredClone(state),
-    alerts: string[] = [];
+    alerts: TaskAlert[] = [];
   for (const tab of next.tabs)
     for (const task of tab.tasks) {
       if (task.status !== "running") continue;
@@ -294,9 +302,20 @@ export function evaluateAlerts(
         task.lastAlertPhase = phase;
         task.lastAlertElapsed = elapsed;
         if (phase === "red" || phase === "overtime") task.yellowShown = true;
-        alerts.push(
-          `${tab.name} · ${task.title}: ${phase === "yellow" ? "Halfway there — keep going." : phase === "red" ? "Final stretch — time to wrap up." : "Overtime — finish or pause when ready."}`,
-        );
+        const prompt =
+          phase === "yellow"
+            ? "Halfway there — keep going."
+            : phase === "red"
+              ? "Final stretch — time to wrap up."
+              : "Overtime — finish or pause when ready.";
+        alerts.push({
+          tabId: tab.id,
+          taskId: task.id,
+          tabName: tab.name,
+          taskTitle: task.title,
+          phase,
+          message: `${tab.name} · ${task.title}: ${prompt}`,
+        });
       }
     }
   return { state: alerts.length ? next : state, alerts };

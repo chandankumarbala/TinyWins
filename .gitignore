@@ -10,3 +10,7 @@ docs
 public/
 !.env.example
 .serena/
+.worktrees/
+src-tauri/target/
+src-tauri/gen/
+/TinyWins_*.dmg

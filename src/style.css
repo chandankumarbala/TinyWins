@@ -104,7 +104,7 @@ nav {
 }
 .tab span {
   font-size: 11px;
-  margin-left: 10px;
+
   font-weight: 400;
   color: var(--muted);
 }
@@ -825,10 +825,15 @@ nav {
   scrollbar-width: thin;
 }
 
+nav > .icon {
+  width: 36px;
+  height: 36px;
+}
+
 .tab {
   display: flex;
   align-items: center;
-  min-height: 34px;
+  min-height: 36px;
   border: 0;
   border-radius: 999px;
   background: rgba(245, 254, 255, 0.48);
@@ -838,17 +843,31 @@ nav {
 }
 
 .tab > button:first-child {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
   padding: 9px 12px;
   color: #153d51;
   font-size: 12px;
   font-weight: 850;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.tab span {
-  margin-left: 9px;
+.tab-name {
+  max-width: 96px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tab-count {
   color: #315c70;
   font-size: 11px;
   font-weight: 750;
+  line-height: 1;
 }
 
 .tab.selected {
@@ -861,7 +880,8 @@ nav {
 }
 
 .tab.selected > button:first-child,
-.tab.selected span {
+.tab.selected .tab-name,
+.tab.selected .tab-count {
   color: #fff;
 }
 
@@ -932,7 +952,7 @@ input {
   min-height: 0;
   max-height: none;
   overflow: auto;
-  padding: 0 0 12px;
+  padding: 0 0 64px;
 }
 
 .task {
@@ -1025,16 +1045,27 @@ input {
   color: #42697c;
 }
 
-footer {
+.workspace > footer {
   flex-shrink: 0;
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  padding: 3px 0 0;
+  padding: 10px 0 0;
   border-top: 0;
   color: #2c5a6d;
   font-size: 11px;
   font-weight: 650;
+  background: linear-gradient(
+    180deg,
+    rgba(213, 246, 255, 0),
+    rgba(213, 246, 255, 0.88) 38%,
+    rgba(213, 246, 255, 0.96)
+  );
+  -webkit-backdrop-filter: blur(12px) saturate(130%);
+  backdrop-filter: blur(12px) saturate(130%);
 }
 
 .toasts > div,
@@ -1125,10 +1156,32 @@ input:focus-visible {
   color: var(--text);
 }
 
+:root[data-theme="dark"] footer {
+  background: linear-gradient(
+    180deg,
+    rgba(9, 46, 66, 0),
+    rgba(9, 46, 66, 0.88) 38%,
+    rgba(9, 46, 66, 0.96)
+  );
+}
+
 :root[data-theme="dark"] .tab.selected,
 :root[data-theme="dark"] .tab.selected > button:first-child,
 :root[data-theme="dark"] .tab.selected span {
   color: #ffffff;
+}
+
+:root[data-theme="dark"] .tab-current-title {
+  color: var(--accent);
+}
+
+:root[data-theme="dark"] .tab-count {
+  color: var(--text);
+}
+
+:root[data-theme="dark"] .tab .icon {
+  color: var(--text);
+  background: rgba(148, 223, 252, 0.16);
 }
 
 :root[data-theme="dark"] .metadata {
@@ -1265,4 +1318,302 @@ input:focus-visible {
 }
 .ai-composer textarea:focus-visible {
   outline: 3px solid var(--focus);
+}
+
+.workspace[data-platform="tauri"] {
+  width: min(100vw, 440px);
+  height: 100dvh;
+  max-height: 100dvh;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+main[data-platform="tauri"] {
+  max-width: 440px;
+  padding: 0;
+  background:
+    radial-gradient(
+      circle at 14% 18%,
+      rgba(94, 245, 211, 0.34),
+      transparent 26%
+    ),
+    radial-gradient(
+      circle at 86% 8%,
+      rgba(38, 167, 255, 0.42),
+      transparent 31%
+    ),
+    radial-gradient(
+      circle at 88% 84%,
+      rgba(156, 232, 255, 0.5),
+      transparent 34%
+    ),
+    linear-gradient(135deg, #efffff 0%, #d6f3ff 58%, #ecffff 100%);
+}
+
+.workspace[data-platform="tauri"]::before {
+  display: none;
+}
+
+.workspace[data-platform="tauri"] header,
+.workspace[data-platform="tauri"] nav,
+.workspace[data-platform="tauri"] .add-task {
+  gap: 8px;
+}
+
+:root[data-theme="dark"] main[data-platform="tauri"] {
+  background:
+    radial-gradient(
+      circle at 14% 18%,
+      rgba(40, 187, 158, 0.24),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at 86% 8%,
+      rgba(38, 153, 224, 0.34),
+      transparent 34%
+    ),
+    linear-gradient(135deg, #061725 0%, #092e42 58%, #082232 100%);
+}
+
+/* Stage 3: compact aqua shell keeps the existing behavior but saves space. */
+.workspace {
+  border-radius: 24px;
+  padding: 20px 18px 0;
+  box-shadow:
+    0 22px 56px rgba(26, 125, 164, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.74);
+}
+
+.workspace > header {
+  min-height: 46px;
+  margin-bottom: 12px;
+}
+
+.brand {
+  gap: 9px;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.brand-mark {
+  width: 34px;
+  height: 34px;
+}
+
+.brand h1 {
+  font-size: 17px;
+  font-weight: 880;
+}
+
+.brand p {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.header-tools {
+  gap: 6px;
+}
+
+.icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 12px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+nav {
+  gap: 6px;
+  margin: 0 0 11px;
+}
+
+nav > .icon {
+  width: 32px;
+  height: 32px;
+}
+
+.tab {
+  min-height: 34px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.tab > button:first-child {
+  gap: 5px;
+  padding: 7px 5px 7px 10px;
+  font-size: 11.5px;
+}
+
+.tab-count {
+  font-size: 10px;
+  font-weight: 880;
+}
+
+.tab .icon {
+  width: 24px;
+  height: 24px;
+  margin-right: 4px;
+}
+
+.add-task {
+  gap: 8px;
+  min-height: 54px;
+  margin: 0 0 12px;
+  padding: 8px 9px 8px 10px;
+  border-radius: 17px;
+  box-shadow:
+    0 10px 22px rgba(24, 128, 173, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.84);
+}
+
+.add-task input {
+  padding: 8px 10px;
+  border: 1px solid rgba(43, 134, 169, 0.18);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.48);
+  font-size: 13px;
+  font-weight: 620;
+}
+
+.add-task > button[type="submit"] {
+  padding: 8px 10px;
+  border-radius: 11px;
+  color: #fff;
+  background: var(--selected);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.add-task .ai {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  min-width: 30px;
+  place-items: center;
+  padding-left: 0;
+}
+
+.add-task .ai[aria-disabled="true"] {
+  color: #6c9db3;
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.task-list {
+  padding: 0 0 66px;
+}
+
+.workspace > footer {
+  min-height: 58px;
+  padding: 21px 2px 12px;
+  font-size: 10.5px;
+  font-weight: 750;
+}
+
+.task {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto auto auto;
+  column-gap: 8px;
+  row-gap: 4px;
+  align-items: center;
+  min-height: 64px;
+  margin: 8px 0;
+  padding: 9px 8px;
+  border-radius: 16px;
+  box-shadow:
+    0 8px 18px rgba(25, 122, 162, 0.07),
+    inset 0 1px 0 rgba(255, 255, 255, 0.76);
+}
+
+.task[data-status="running"] {
+  border-left: 2px solid var(--accent);
+  box-shadow:
+    0 10px 24px rgba(8, 119, 238, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+
+.task-title {
+  display: block;
+  width: 100%;
+  padding: 0 0 4px;
+  font-size: 13.5px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.metadata {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 6px;
+  overflow: hidden;
+  font-size: 10.5px;
+  font-weight: 650;
+  line-height: 1.25;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.task .icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+}
+
+.task-delete {
+  color: #17495f;
+  background: rgba(247, 254, 255, 0.86);
+  border-color: rgba(255, 255, 255, 0.82);
+}
+
+:root[data-theme="dark"] .workspace {
+  box-shadow:
+    0 22px 56px rgba(0, 8, 18, 0.3),
+    inset 0 1px 0 rgba(169, 230, 255, 0.16);
+}
+
+:root[data-theme="dark"] .brand {
+  background: transparent;
+}
+
+:root[data-theme="dark"] .add-task input {
+  background: rgba(11, 42, 58, 0.42);
+}
+
+:root[data-theme="dark"] .task-delete {
+  color: var(--text);
+  background: rgba(17, 59, 78, 0.74);
+}
+
+.settings-panel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.48);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.settings-panel header,
+.settings-panel label,
+.settings-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.settings-panel h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.settings-panel select,
+.settings-panel button {
+  color: var(--text);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 7px 10px;
 }
